@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore a model-generated Big Five personality trait overview based on 50 self-report statements.">
+  <title>Personality Profile | Big Five MLP</title>
+  <style>
+    :root { --ink:#20223a; --muted:#6b6f86; --line:#e7e7f1; --purple:#6657d9; --lav:#f3f1ff; --bg:#f8f8fc; --white:#fff; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .hero { background:linear-gradient(135deg,#f0edff,#fbfaff 62%,#edf5ff); padding:54px 20px 42px; border-bottom:1px solid var(--line); }
+    .hero-inner, main { max-width:980px; margin:0 auto; }
+    .eyebrow { color:var(--purple); font-size:.78rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+    h1 { margin:10px 0 12px; font-size:clamp(2rem,5vw,3.2rem); line-height:1.08; letter-spacing:-.04em; }
+    .hero p { max-width:720px; margin:0; color:#5d6079; }
+    .pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+    .pill { background:#fff; border:1px solid #e5e0ff; color:#5144b7; border-radius:999px; padding:6px 12px; font-size:.83rem; font-weight:650; }
+    main { padding:28px 18px 60px; }
+    .notice { background:#fff8e8; border:1px solid #f3dfaa; border-radius:14px; padding:13px 16px; color:#76551a; font-size:.9rem; margin-bottom:22px; }
+    .section { background:var(--white); border:1px solid var(--line); border-radius:18px; padding:22px; margin:18px 0; box-shadow:0 5px 18px rgba(40,35,90,.035); }
+    .section-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:17px; }
+    h2 { font-size:1.25rem; margin:0 0 4px; letter-spacing:-.02em; }
+    .sub { color:var(--muted); font-size:.9rem; margin:0; }
+    .count { flex-shrink:0; background:var(--lav); color:#5548c3; border-radius:10px; padding:5px 9px; font-size:.8rem; font-weight:750; }
+    .question { border-top:1px solid #f0f0f6; padding:17px 0 15px; }
+    .question:first-of-type { border-top:0; }
+    .qtext { display:block; font-weight:650; margin-bottom:12px; }
+    .qcode { color:#8a8ba0; font-size:.78rem; font-weight:700; margin-right:7px; }
+    .choices { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+    .choice { position:relative; }
+    .choice input { position:absolute; opacity:0; inset:0; cursor:pointer; }
+    .choice span { display:flex; min-height:43px; align-items:center; justify-content:center; border:1px solid #dedfec; border-radius:10px; color:#575a70; font-size:.9rem; background:#fff; transition:.15s; }
+    .choice input:checked + span { background:var(--lav); border-color:var(--purple); color:#493bb3; box-shadow:inset 0 0 0 1px var(--purple); font-weight:800; }
+    .choice input:focus-visible + span { outline:3px solid #b8afff; outline-offset:2px; }
+    .scale-labels { display:flex; justify-content:space-between; color:#898ba0; font-size:.75rem; margin-top:6px; }
+    .actions { position:sticky; bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px; margin:24px 0; background:rgba(255,255,255,.94); border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 28px rgba(30,25,80,.12); backdrop-filter:blur(10px); }
+    .progress-text { color:var(--muted); font-size:.88rem; }
+    button { border:0; background:var(--purple); color:#fff; font:inherit; font-weight:750; border-radius:11px; padding:12px 19px; cursor:pointer; }
+    button:hover { background:#5142c6; }
+    .error { background:#fff0f0; border:1px solid #f2bcbc; border-radius:12px; padding:12px 15px; color:#9d2929; margin-bottom:18px; }
+    .results { border:1px solid #dcd7ff; background:linear-gradient(145deg,#fff,#faf9ff); }
+    .result-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; margin-top:18px; }
+    .trait { border:1px solid var(--line); border-radius:14px; padding:16px; background:#fff; }
+    .trait-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .trait h3 { margin:0; font-size:1rem; }
+    .score { font-size:1.1rem; font-weight:850; white-space:nowrap; }
+    .level { display:inline-block; border-radius:999px; padding:3px 9px; background:var(--lav); color:#5548c3; font-size:.75rem; font-weight:800; margin-top:8px; }
+    .bar { height:7px; border-radius:99px; background:#eeeefa; margin:12px 0; overflow:hidden; }
+    .bar > span { display:block; height:100%; background:linear-gradient(90deg,#8173ef,#5d4bd1); border-radius:99px; }
+    .trait p { color:var(--muted); font-size:.9rem; margin:0; }
+    .summary { margin-top:18px; padding:17px; border-radius:14px; background:#f5f3ff; color:#3c356e; }
+    .summary h3 { margin:0 0 7px; }
+    .summary p { margin:0; }
+    .result-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+    .secondary { background:#fff; border:1px solid #d8d5ed; color:#5144b7; }
+    footer { text-align:center; color:#8a8ba0; font-size:.82rem; padding:0 18px 32px; }
+    @media(max-width:640px) { .hero{padding:38px 18px 30px}.section{padding:16px}.result-grid{grid-template-columns:1fr}.section-head{gap:8px}.actions{align-items:flex-start;flex-direction:column}.actions button{width:100%}.choice span{font-size:.82rem;min-height:40px} }
+  </style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">Personality exploration · MLP model</div>
+    <h1>Your personality,<br>in five dimensions.</h1>
+    <p>Answer 50 short statements to receive a model-generated overview of five Big Five traits. Choose the response that best reflects how you generally feel or behave.</p>
+    <div class="pills"><span class="pill">50 statements</span><span class="pill">1–5 response scale</span><span class="pill">Five trait estimates</span></div>
+  </div>
+</header>
+<main>
+  <div class="notice"><strong>Note:</strong> This is an educational demonstration, not a clinical or psychological assessment. The results are estimates produced by a trained model and should not be treated as a definitive description of you.</div>
+  {% if results %}
+  <section class="section results" id="results">
+    <div class="eyebrow">Your results</div>
+    <h2 style="font-size:1.7rem;margin-top:5px">Your Big Five overview</h2>
+    <p class="sub">Scores are shown on a scale from 1 to 5. The level labels follow this project's thresholds: Low below 2.5, Medium from 2.5 to below 3.5, and High from 3.5 onward.</p>
+    <div class="result-grid">
+      {% for item in results %}
+      <article class="trait">
+        <div class="trait-top"><h3>{{ item.name }}</h3><span class="score">{{ "%.2f"|format(item.score) }}<span style="font-size:.76rem;color:#888aa0;font-weight:600"> / 5</span></span></div>
+        <span class="level">{{ item.level }}</span>
+        <div class="bar"><span style="width:{{ item.percent }}%"></span></div>
+        <p>{{ item.description|capitalize }}.</p>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="summary"><h3>Personality trait overview</h3><p>{{ summary }}</p></div>
+    <div class="result-actions">
+      <button type="button" onclick="window.print()">Print / Save results</button>
+      <button type="button" class="secondary" onclick="window.location.href='/'">Take the questionnaire again</button>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/predict" id="questionnaire">
+    <section class="section">
+      <div class="section-head"><div><h2>How to answer</h2><p class="sub">Select one option for every statement. There are no right or wrong answers.</p></div></div>
+      <div class="scale-labels"><span>1 = Disagree</span><span>3 = Neutral</span><span>5 = Agree</span></div>
+    </section>
+    {% for group in groups %}
+    <section class="section">
+      <div class="section-head"><div><h2>{{ group.title }}</h2><p class="sub">{{ group.subtitle }}</p></div><span class="count">10 statements</span></div>
+      {% for q in group.questions %}
+      <div class="question">
+        <label class="qtext" for="{{ q.code }}-1"><span class="qcode">{{ loop.index + loop.index0*0 }}.</span>{{ q.text }}</label>
+        <div class="choices">
+          {% for value in [1,2,3,4,5] %}
+          <label class="choice">
+            <input type="radio" id="{{ q.code }}-{{ value }}" name="{{ q.code }}" value="{{ value }}" {% if answers.get(q.code, 0)|int == value %}checked{% endif %} required>
+            <span>{{ value }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+    {% endfor %}
+    <div class="actions"><span class="progress-text" id="progress">0 of 50 answered</span><button type="submit">Generate my profile →</button></div>
+  </form>
+</main>
+<footer>Built with Flask and a trained multi-output MLP · For educational use</footer>
+<script>
+  const form = document.getElementById('questionnaire');
+  const progress = document.getElementById('progress');
+  function updateProgress() {
+    const answered = new Set([...form.querySelectorAll('input[type="radio"]:checked')].map(input => input.name)).size;
+    progress.textContent = `${answered} of 50 answered`;
+  }
+  form.addEventListener('change', updateProgress);
+  updateProgress();
+  {% if results %}
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+  {% endif %}
+</script>
+</body>
+</html>
