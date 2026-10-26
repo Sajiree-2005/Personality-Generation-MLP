@@ -3,6 +3,6 @@ services:
     name: personality-generation-mlp
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --workers 1 --threads 2 --timeout 120 --graceful-timeout 30
     plan: free
     healthCheckPath: /health

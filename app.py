@@ -1,5 +1,12 @@
 import os
+import logging
+import time
 from pathlib import Path
+
+# Keep TensorFlow from creating large CPU thread pools on small hosting instances.
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import joblib
 import numpy as np
@@ -15,11 +22,14 @@ SCALER_PATH = OUTPUT_DIR / "personality_input_scaler.pkl"
 METADATA_PATH = OUTPUT_DIR / "personality_model_metadata.pkl"
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 
 # Load artifacts once when the web process starts, not on every request.
+_start = time.perf_counter()
 model = tf.keras.models.load_model(MODEL_PATH, compile=False)
 scaler = joblib.load(SCALER_PATH)
 metadata = joblib.load(METADATA_PATH)
+app.logger.info("Model artifacts loaded in %.2f seconds", time.perf_counter() - _start)
 
 QUESTION_COLUMNS = metadata["question_columns"]
 TRAITS = metadata["traits"]
@@ -96,8 +106,14 @@ def trait_level(score):
 def predict(answers):
     # Preserve the exact feature order used to train the model.
     row = pd.DataFrame([[answers[col] for col in QUESTION_COLUMNS]], columns=QUESTION_COLUMNS)
-    scaled = scaler.transform(row)
-    raw_scores = model.predict(scaled, verbose=0)[0]
+    _start = time.perf_counter()
+    scaled = scaler.transform(row).astype(np.float32, copy=False)
+    app.logger.info("Prediction preprocessing completed in %.3f seconds", time.perf_counter() - _start)
+
+    # Calling the model directly avoids Keras predict() data-adapter overhead for one row.
+    _start = time.perf_counter()
+    raw_scores = np.asarray(model(scaled, training=False))[0]
+    app.logger.info("Model inference completed in %.3f seconds", time.perf_counter() - _start)
     scores = np.clip(raw_scores, 1, 5)
     results = []
     score_map = {}
@@ -132,6 +148,8 @@ def index():
 
 @app.post("/predict")
 def predict_route():
+    _request_start = time.perf_counter()
+    app.logger.info("Received POST /predict")
     answers = {}
     errors = []
     for code in QUESTION_COLUMNS:
@@ -155,7 +173,13 @@ def predict_route():
             error=f"Please answer all 50 statements. {len(errors)} answer(s) are missing or invalid."
         ), 400
 
-    results, summary = predict(answers)
+    try:
+        results, summary = predict(answers)
+    except Exception:
+        app.logger.exception("Prediction failed while processing POST /predict")
+        return "Prediction failed on the server. Check the service logs for the detailed error.", 500
+
+    app.logger.info("POST /predict completed in %.3f seconds", time.perf_counter() - _request_start)
     return render_template(
         "index.html", groups=groups, results=results, summary=summary, answers=answers, error=None
     )
